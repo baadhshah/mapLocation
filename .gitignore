@@ -81,5 +81,6 @@ android-sdk/
 eslint-report.json
 junit.xml
 scripts/generate-keystore.sh
-package-lock.json
+# package-lock.json - Keep this committed for consistent builds in CI/CD
+# Removed from .gitignore - needed for GitHub Actions
 ios/Podfile.lock
