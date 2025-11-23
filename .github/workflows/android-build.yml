@@ -1,6 +1,6 @@
 # GitHub Actions Workflow for React Native Android Builds
-# Optimized for GitHub Free Tier - Minimal parallel jobs
-# Focus: Build preparation (lint, test, build) - No deployment
+# Optimized for GitHub Free Tier
+# Focus: Prepare → Lint → Test → Build Release APK → Build AAB
 
 name: Android Build Pipeline
 
@@ -11,30 +11,20 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
 
 env:
-  # Android SDK Configuration
   ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
   ANDROID_HOME: ${{ github.workspace }}/android-sdk
-  ANDROID_SDK_TOOLS: "11076708"  # Command line tools version
+  ANDROID_SDK_TOOLS: "11076708"
   ANDROID_PLATFORM_VERSION: "36"
   ANDROID_BUILD_TOOLS_VERSION: "36.0.0"
   ANDROID_NDK_VERSION: "27.1.12297006"
-  
-  # Gradle Configuration
   GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
-  
-  # Node.js Configuration
   NODE_ENV: "production"
-  NPM_CONFIG_CACHE: ${{ github.workspace }}/.npm
 
 jobs:
-  # ============================================
-  # COMBINED PREPARE STAGE (Optimized for free tier)
-  # ============================================
-  
   prepare:
     name: Prepare Environment
     runs-on: ubuntu-latest
@@ -56,58 +46,46 @@ jobs:
       
       - name: Cache dependencies
         uses: actions/cache@v4
+        id: cache
         with:
           path: |
             node_modules
             ${{ env.ANDROID_SDK_ROOT }}
             ${{ env.GRADLE_USER_HOME }}
-            ${{ env.NPM_CONFIG_CACHE }}
           key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-deps-
       
       - name: Install Node.js dependencies
-        run: npm ci --cache .npm --prefer-offline
+        run: npm ci
       
       - name: Setup Android SDK
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
-            echo "Setting up Android SDK..."
-            mkdir -p ${{ env.ANDROID_SDK_ROOT }}
-            cd ${{ env.ANDROID_SDK_ROOT }}
-            
-            # Download command line tools
-            wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O cmdline-tools.zip
-            unzip -q cmdline-tools.zip
-            mkdir -p cmdline-tools/latest
-            mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-            rm -f cmdline-tools.zip
-            
-            # Accept licenses and install packages
-            yes | ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-            ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager \
-              "platform-tools" \
-              "platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}" \
-              "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}" \
-              "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          else
-            echo "Android SDK already cached"
-          fi
+          mkdir -p ${{ env.ANDROID_SDK_ROOT }}
+          cd ${{ env.ANDROID_SDK_ROOT }}
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+          rm -f cmdline-tools.zip
+          yes | ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}" \
+            "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}" \
+            "ndk;${{ env.ANDROID_NDK_VERSION }}"
       
       - name: Save cache
+        if: steps.cache.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: |
             node_modules
             ${{ env.ANDROID_SDK_ROOT }}
             ${{ env.GRADLE_USER_HOME }}
-            ${{ env.NPM_CONFIG_CACHE }}
           key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
 
-  # ============================================
-  # LINT STAGE
-  # ============================================
-  
   lint:
     name: Lint Code
     runs-on: ubuntu-latest
@@ -139,6 +117,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-
       
+      - name: Install dependencies
+        run: npm ci
+      
       - name: Setup Android SDK
         run: |
           if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
@@ -168,10 +149,6 @@ jobs:
           ./gradlew lint --no-daemon --stacktrace || true
         continue-on-error: true
 
-  # ============================================
-  # TEST STAGE
-  # ============================================
-  
   test:
     name: Run Tests
     runs-on: ubuntu-latest
@@ -203,6 +180,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-deps-
       
+      - name: Install dependencies
+        run: npm ci
+      
       - name: Setup Android SDK
         run: |
           if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
@@ -232,77 +212,10 @@ jobs:
           ./gradlew testDebugUnitTest --no-daemon --stacktrace || true
         continue-on-error: true
 
-  # ============================================
-  # BUILD STAGE
-  # ============================================
-  
-  build-debug:
-    name: Build Debug APK
-    runs-on: ubuntu-latest
-    needs: prepare
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Restore cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-      
-      - name: Setup Android SDK
-        run: |
-          if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
-            mkdir -p ${{ env.ANDROID_SDK_ROOT }}
-            cd ${{ env.ANDROID_SDK_ROOT }}
-            wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O cmdline-tools.zip
-            unzip -q cmdline-tools.zip
-            mkdir -p cmdline-tools/latest
-            mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-            rm -f cmdline-tools.zip
-            yes | ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-            ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager \
-              "platform-tools" \
-              "platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}" \
-              "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}" \
-              "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          fi
-      
-      - name: Build Debug APK
-        working-directory: android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-      
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
-          retention-days: 7
-
-  build-release:
+  build-release-apk:
     name: Build Release APK
     runs-on: ubuntu-latest
-    needs: prepare
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: [prepare, lint, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -329,6 +242,9 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-deps-
+      
+      - name: Install Node.js dependencies
+        run: npm ci
       
       - name: Setup Android SDK
         run: |
@@ -377,8 +293,7 @@ jobs:
   build-release-aab:
     name: Build Release AAB
     runs-on: ubuntu-latest
-    needs: prepare
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: build-release-apk
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -405,6 +320,9 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-deps-
+      
+      - name: Install Node.js dependencies
+        run: npm ci
       
       - name: Setup Android SDK
         run: |
