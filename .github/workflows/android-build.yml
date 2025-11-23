@@ -78,11 +78,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Cache Android SDK
@@ -153,11 +149,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Restore Gradle cache
@@ -243,11 +235,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Restore Gradle cache
@@ -296,11 +284,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Setup Node.js
@@ -357,11 +341,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Setup Node.js
@@ -433,11 +413,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: |
-            platform-tools
-            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
-            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-            ndk;${{ env.ANDROID_NDK_VERSION }}
+          packages: platform-tools,platforms;android-36,build-tools;36.0.0,ndk;27.1.12297006
           accept-android-sdk-licenses: true
       
       - name: Setup Node.js
