@@ -1,7 +1,16 @@
 // IMPORTANT: pluginManagement must come before other statements.
 pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        mavenLocal()
+    }
     includeBuild("../node_modules/@react-native/gradle-plugin")
 }
+
+// Make React Native plugins available to all projects via plugins block
+// This is needed because includeBuild only makes plugins available to root project
 plugins {
     id("com.facebook.react.settings")
 }
@@ -18,3 +27,6 @@ plugins {
 
 rootProject.name = 'MapLocation'
 include ':app'
+
+// Autolinking - include React Native native modules
+reactSettings.autolinkLibrariesFromCommand()

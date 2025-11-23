@@ -17,4 +17,44 @@ buildscript {
     }
 }
 
-apply plugin: "com.facebook.react.rootproject"
+// Apply React Native root project plugin
+plugins {
+    id("com.facebook.react.rootproject")
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url("https://www.jitpack.io") }
+    }
+    
+    // Make React Native plugin available to all subprojects
+    buildscript {
+        repositories {
+            google()
+            mavenCentral()
+        }
+    }
+}
+
+// React Native root project plugin functionality
+// The plugin sets up evaluation dependencies and preBuild task dependencies
+// Since includeBuild isn't making the plugin available, we implement it manually
+subprojects {
+    if (it.path != ":app") {
+        it.evaluationDependsOn(":app")
+    }
+}
+
+// Make :app:preBuild depend on all other subprojects' preBuild tasks
+gradle.projectsEvaluated {
+    def appProject = rootProject.subprojects.find { it.name == "app" }
+    def appPreBuild = appProject?.tasks?.findByName("preBuild")
+    if (appPreBuild != null) {
+        def otherPreBuildTasks = rootProject.subprojects
+            .findAll { it != appProject }
+            .collectMany { it.tasks.findAll { it.name == "preBuild" } }
+        appPreBuild.dependsOn(otherPreBuildTasks)
+    }
+}

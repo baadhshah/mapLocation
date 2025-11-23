@@ -5,9 +5,6 @@ module.exports = {
       sourceDir: './android',
       appName: 'app',
     },
-    ios: {
-      project: './ios/MapLocation.xcworkspace',
-    },
   },
 };
 

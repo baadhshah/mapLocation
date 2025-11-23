@@ -1,0 +1,12 @@
+// Auto-build React Native Gradle plugin if needed
+def pluginJar = new File(settingsDir.parentFile, "node_modules/@react-native/gradle-plugin/react-native-gradle-plugin/build/libs/react-native-gradle-plugin.jar")
+def pluginDir = new File(settingsDir.parentFile, "node_modules/@react-native/gradle-plugin")
+
+if (pluginDir.exists() && (!pluginJar.exists() || pluginJar.lastModified() < new File(pluginDir, "react-native-gradle-plugin/build.gradle.kts").lastModified())) {
+    println "Building React Native Gradle plugin..."
+    def proc = ["bash", "-c", "cd ${pluginDir.absolutePath} && chmod +x gradlew && ./gradlew :react-native-gradle-plugin:build --no-daemon"].execute()
+    proc.waitFor()
+    if (proc.exitValue() != 0) {
+        println "Warning: Failed to build React Native Gradle plugin: ${proc.err.text}"
+    }
+}

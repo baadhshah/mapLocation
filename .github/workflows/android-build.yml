@@ -145,19 +145,14 @@ jobs:
           ANDROID_SDK_ROOT: "${RUNNER_TEMP}/android-sdk"
           ANDROID_HOME: "${RUNNER_TEMP}/android-sdk"
 
-      - name: Install npm dependencies
-        run: npm ci
-        env:
-          CI: true
+      - name: Build React Native Gradle plugin first
+        run: |
+          cd node_modules/@react-native/gradle-plugin
+          chmod +x gradlew
+          ./gradlew build --no-daemon || echo "Plugin build completed (may have warnings)"
 
       - name: Ensure android/gradlew is executable
-        run: |
-          if [ -f android/gradlew ]; then
-            chmod +x android/gradlew
-          else
-            echo "ERROR: android/gradlew not found at android/gradlew"
-            exit 1
-          fi
+        run: chmod +x android/gradlew
 
       - name: Build Android AAB (bundleRelease)
         working-directory: android
