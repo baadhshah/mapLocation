@@ -8,36 +8,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Lint → Test → Build AAB
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 90
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Set up Node.js (for npx, lint, tests)
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
 
       - name: Install npm dependencies (if needed)
         run: |
@@ -47,6 +30,7 @@ jobs:
             npm install
           else
             echo "No lockfile found; skipping npm install"
+          fi
         env:
           CI: true
 
@@ -58,6 +42,33 @@ jobs:
             echo "No npm lint script found; skipping lint"
           fi
 
+  test:
+    name: Unit tests
+    needs: lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install npm dependencies (if needed)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f yarn.lock ]; then
+            npm install
+          else
+            echo "No lockfile found; skipping npm install"
+          fi
+        env:
+          CI: true
+
       - name: Run unit tests (if configured)
         run: |
           if npm run | grep -q "test"; then
@@ -66,10 +77,44 @@ jobs:
             echo "No npm test script found; skipping JS unit tests"
           fi
 
+  build:
+    name: Build AAB
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Node.js (for autolink if needed)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install npm dependencies (if needed)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f yarn.lock ]; then
+            npm install
+          else
+            echo "No lockfile found; skipping npm install"
+          fi
+        env:
+          CI: true
+
       - name: Install Android commandline tools and SDK packages
         run: |
           set -euo pipefail
-          ANDROID_SDK_ROOT="${{ runner.temp }}/android-sdk"
+          ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
           mkdir -p "$ANDROID_SDK_ROOT"
           cd "$HOME"
           CLI_ZIP="commandlinetools-linux-9477386_latest.zip"
@@ -96,11 +141,10 @@ jobs:
 
       - name: Build Android AAB (bundleRelease)
         working-directory: android
-        env:
-          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-          ANDROID_HOME: ${{ runner.temp }}/android-sdk
         run: |
           set -euo pipefail
+          export ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
+          export ANDROID_HOME="${RUNNER_TEMP}/android-sdk"
           ./gradlew clean bundleRelease --no-daemon --stacktrace
 
       - name: Upload AAB artifact
