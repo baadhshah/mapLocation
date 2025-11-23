@@ -1,44 +1,20 @@
-// Safe helper to run npx during settings evaluation.
-// Place at the top so other logic can test for npx availability.
-def safeRunNpx(List args) {
-    try {
-        def stdout = new ByteArrayOutputStream()
-        def stderr = new ByteArrayOutputStream()
-        def result = exec {
-            commandLine = ['npx'] + args
-            standardOutput = stdout
-            errorOutput = stderr
-            ignoreExitValue = true
-        }
-        def outText = stdout.toString().trim()
-        def errText = stderr.toString().trim()
-        if (result.exitValue != 0) {
-            println "Warning: npx ${args.join(' ')} exited ${result.exitValue}; stderr: ${errText}"
-            return null
-        }
-        return outText
-    } catch (Exception e) {
-        println "Warning: failed to run npx: ${e.message}"
-        return null
-    }
+// IMPORTANT: pluginManagement must come before other statements.
+pluginManagement {
+    includeBuild("../node_modules/@react-native/gradle-plugin")
+}
+plugins {
+    id("com.facebook.react.settings")
 }
 
-// Check whether npx is available (returns non-null if available)
-def npxAvailable() {
-    return safeRunNpx(['--version']) != null
-}
-
-// Plugin/includeBuild (only include once)
-pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
-plugins { id("com.facebook.react.settings") }
-
-// If npx is available, run autolink; otherwise warn and continue (avoid failing settings evaluation)
-if (npxAvailable()) {
-    extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
-} else {
-    println "Warning: npx not available — skipping autolinkLibrariesFromCommand(). Ensure Node is installed in CI or run autolinking separately."
-}
+// NOTE: Removed any npx/autolink invocation from settings.gradle.
+// Running external processes (npx) during settings evaluation starts
+// external processes during configuration time and breaks Gradle's configuration cache.
+// If you need to run autolinking, run it as a separate step (e.g., npm script or Gradle task executed
+// during the execution phase) before Gradle evaluates the project, or run it locally.
+//
+// Example:
+//   - Add an npm script "autolink" that runs the required npx call, and invoke it in CI before Gradle.
+//   - Or implement autolinking via a Gradle task executed during execution phase (not settings evaluation).
 
 rootProject.name = 'MapLocation'
 include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')

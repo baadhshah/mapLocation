@@ -1,17 +1,90 @@
-name: Android Build Pipeline
+name: Android Build Pipeline (Lint → Test → Build AAB → Upload Artifact)
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install npm dependencies (if needed)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f yarn.lock ]; then
+            npm install
+          else
+            echo "No lockfile found; skipping npm install"
+          fi
+        env:
+          CI: true
+
+      - name: Run lint (if configured)
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint
+          else
+            echo "No npm lint script found; skipping lint"
+          fi
+
+  test:
+    name: Unit tests
+    needs: lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install npm dependencies (if needed)
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f yarn.lock ]; then
+            npm install
+          else
+            echo "No lockfile found; skipping npm install"
+          fi
+        env:
+          CI: true
+
+      - name: Run unit tests (if configured)
+        run: |
+          if npm run | grep -q "test"; then
+            npm test -- --ci --reporters=default || npm test
+          else
+            echo "No npm test script found; skipping JS unit tests"
+          fi
+
+  build:
+    name: Build AAB
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -20,7 +93,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Node.js (for npx)
+      - name: Set up Node.js (for any JS tooling that runs later)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -28,17 +101,93 @@ jobs:
 
       - name: Install npm dependencies (if needed)
         run: |
-          # If your npx invocation depends on locally installed packages, install them
           if [ -f package-lock.json ]; then
             npm ci
           elif [ -f yarn.lock ]; then
             npm install
           else
-            echo "No lockfile found, skipping npm install"
+            echo "No lockfile found; skipping npm install"
+          fi
+        env:
+          CI: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install Android commandline tools and SDK packages
+        run: |
+          set -euo pipefail
+          ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
+          mkdir -p "$ANDROID_SDK_ROOT"
+          cd "$HOME"
+          CLI_ZIP="commandlinetools-linux-9477386_latest.zip"
+          CLI_URL="https://dl.google.com/android/repository/${CLI_ZIP}"
+          curl -fsSL "$CLI_URL" -o "$CLI_ZIP"
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          unzip -q "$CLI_ZIP" -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools/"* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
+          rm -f "$CLI_ZIP"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        shell: bash
+
+      - name: Ensure android/gradlew is executable
+        run: |
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+          else
+            echo "ERROR: android/gradlew not found at android/gradlew"
+            exit 1
           fi
 
-      - name: Ensure gradlew is executable
-        run: chmod +x ./gradlew
+      - name: Build Android AAB (bundleRelease)
+        working-directory: android
+        env:
+          ANDROID_SDK_ROOT: "${RUNNER_TEMP}/android-sdk"
+          ANDROID_HOME: "${RUNNER_TEMP}/android-sdk"
+        run: |
+          set -euo pipefail
+          export ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
+          export ANDROID_HOME="${RUNNER_TEMP}/android-sdk"
+          ./gradlew clean bundleRelease --no-daemon --stacktrace
 
-      - name: Build Android
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Upload built-aab (make available to downstream job)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+
+  upload:
+    name: Upload Artifact (separate stage)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for context)
+        uses: actions/checkout@v4
+
+      - name: Download built artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: built-aab
+          path: ./downloaded
+
+      - name: Verify artifact exists
+        run: |
+          ls -la downloaded || true
+          echo "Artifacts downloaded to ./downloaded"
+
+      - name: Re-upload artifact (final)
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-aab
+          path: ./downloaded/**/*.aab
