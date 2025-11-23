@@ -82,3 +82,4 @@ eslint-report.json
 junit.xml
 scripts/generate-keystore.sh
 package-lock.json
+ios/Podfile.lock
