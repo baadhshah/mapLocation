@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
@@ -78,9 +78,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Cache Android SDK
         uses: actions/cache@v4
@@ -114,7 +117,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
       
@@ -150,9 +153,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Restore Gradle cache
         uses: actions/cache@v4
@@ -202,7 +208,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
       
@@ -237,9 +243,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Restore Gradle cache
         uses: actions/cache@v4
@@ -287,9 +296,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -345,9 +357,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -418,9 +433,12 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: ${{ env.ANDROID_PLATFORM_VERSION }}
-          build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
-          ndk: ${{ env.ANDROID_NDK_VERSION }}
+          packages: |
+            platform-tools
+            platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+            ndk;${{ env.ANDROID_NDK_VERSION }}
+          accept-android-sdk-licenses: true
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
