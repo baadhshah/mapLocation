@@ -1,4 +1,7 @@
 {
   "name": "MapLocation",
-  "displayName": "MapLocation"
+  "displayName": "MapLocation",
+  "android": {
+    "package": "com.maplocation"
+  }
 }
