@@ -1,5 +1,9 @@
-// Safe helper to run npx during settings evaluation.
-// Place at the top so other logic can test for npx availability.
+// Safe handling for Node/npx calls during settings evaluation.
+// NOTE: calling external processes during Gradle configuration is discouraged and
+// may cause configuration-cache warnings. We keep the call but make it non-fatal
+// so CI can proceed if Node is properly installed (workflow installs Node before Gradle).
+
+// Safer wrapper to run npx and return stdout or null on failure.
 def safeRunNpx(List args) {
     try {
         def stdout = new ByteArrayOutputStream()
@@ -18,27 +22,33 @@ def safeRunNpx(List args) {
         }
         return outText
     } catch (Exception e) {
-        println "Warning: failed to run npx: ${e.message}"
+        println "Warning: failed to run npx ${args.join(' ')}: ${e.message}"
         return null
     }
 }
 
-// Check whether npx is available (returns non-null if available)
-def npxAvailable() {
-    return safeRunNpx(['--version']) != null
+// Try a runtime check (this will still start an external process).
+// If npx is present and functioning, some autolink operations can run.
+// If not, we log a warning and continue so CI doesn't fail here.
+def nodeCheck = safeRunNpx(['--version'])
+if (nodeCheck != null) {
+    // Node/npx appears available — attempt to run React Native autolink if present.
+    try {
+        // Extensions call that may internally invoke npx.
+        extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+    } catch (Exception e) {
+        println "Warning: autolinkLibrariesFromCommand() raised: ${e.message}. Continuing without autolink."
+    }
+} else {
+    println "Warning: npx not available or failed; skipping autolinkLibrariesFromCommand(). Ensure CI installs Node before Gradle."
 }
 
-// Plugin/includeBuild (only include once)
+// Plugin/includeBuild (only include the react-native gradle plugin once)
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
 
-// If npx is available, run autolink; otherwise warn and continue (avoid failing settings evaluation)
-if (npxAvailable()) {
-    extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
-} else {
-    println "Warning: npx not available — skipping autolinkLibrariesFromCommand(). Ensure Node is installed in CI or run autolinking separately."
-}
-
 rootProject.name = 'MapLocation'
 include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')
+
+// If your project requires additional includes, keep them here.
+// includeBuild('../node_modules/@react-native/gradle-plugin')  // already included above
