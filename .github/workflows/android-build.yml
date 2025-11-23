@@ -72,6 +72,7 @@ jobs:
       - name: Run unit tests (if configured)
         run: |
           if npm run | grep -q "test"; then
+            # prefer CI mode for jest; fall back to plain npm test
             npm test -- --ci --reporters=default || npm test
           else
             echo "No npm test script found; skipping JS unit tests"
@@ -111,6 +112,16 @@ jobs:
         env:
           CI: true
 
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Install Android commandline tools and SDK packages
         run: |
           set -euo pipefail
@@ -141,6 +152,9 @@ jobs:
 
       - name: Build Android AAB (bundleRelease)
         working-directory: android
+        env:
+          ANDROID_SDK_ROOT: ${{ env.RUNNER_TEMP }}/android-sdk
+          ANDROID_HOME: ${{ env.RUNNER_TEMP }}/android-sdk
         run: |
           set -euo pipefail
           export ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
