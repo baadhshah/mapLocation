@@ -1,14 +1,22 @@
-name: Android Build Pipeline
+name: Android Build Pipeline (Lint → Test → Build AAB)
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Lint → Test → Build AAB
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      # Standard Android SDK location used by many tools
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      JAVA_HOME_17_X64: ${{ env.JAVA_HOME_17_X64 }}
 
     steps:
       - name: Checkout repository
@@ -20,25 +28,93 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Node.js (for npx)
+      - name: Set up Node.js (for npx, lint, tests)
         uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
 
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Install npm dependencies (if needed)
         run: |
-          # If your npx invocation depends on locally installed packages, install them
           if [ -f package-lock.json ]; then
             npm ci
           elif [ -f yarn.lock ]; then
             npm install
           else
-            echo "No lockfile found, skipping npm install"
+            echo "No lockfile found; skipping npm install"
+        env:
+          CI: true
+
+      - name: Run lint (if configured)
+        run: |
+          if npm run | grep -q "lint"; then
+            npm run lint
+          else
+            echo "No npm lint script found; skipping lint"
           fi
 
-      - name: Ensure gradlew is executable
-        run: chmod +x ./gradlew
+      - name: Run unit tests (if configured)
+        run: |
+          if npm run | grep -q "test"; then
+            # Try npm test in CI mode; adjust if your test command differs
+            npm test -- --ci --reporters=default || npm test
+          else
+            echo "No npm test script found; skipping JS unit tests"
+          fi
 
-      - name: Build Android
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Install Android commandline tools and SDK packages
+        run: |
+          set -euo pipefail
+          export ANDROID_SDK_ROOT="${{ runner.temp }}/android-sdk"
+          mkdir -p "$ANDROID_SDK_ROOT"
+          cd $HOME
+          CLI_ZIP="commandlinetools-linux-9477386_latest.zip"
+          CLI_URL="https://dl.google.com/android/repository/${CLI_ZIP}"
+          # Download commandline tools (versioned). If this URL breaks in the future, replace with latest.
+          curl -fsSL "$CLI_URL" -o "$CLI_ZIP"
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          unzip -q "$CLI_ZIP" -d "$ANDROID_SDK_ROOT/cmdline-tools"
+          # The zip extracts a 'cmdline-tools' folder; move it under 'latest' to match sdkmanager expectations
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools/"* "$ANDROID_SDK_ROOT/cmdline-tools/latest/" || true
+          rm -f "$CLI_ZIP"
+          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses || true
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+        shell: bash
+
+      - name: Ensure android/gradlew is executable
+        run: |
+          if [ -f android/gradlew ]; then
+            chmod +x android/gradlew
+          else
+            echo "ERROR: android/gradlew not found at android/gradlew"
+            exit 1
+          fi
+
+      - name: Build Android AAB (bundleRelease)
+        working-directory: android
+        env:
+          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          JAVA_HOME: ${{ steps.setup-java.outputs.java-home }} || /usr/lib/jvm
+        run: |
+          set -euo pipefail
+          ./gradlew clean bundleRelease --no-daemon --stacktrace
+
+      - name: Upload AAB artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-aab
+          path: android/app/build/outputs/bundle/release/*.aab
