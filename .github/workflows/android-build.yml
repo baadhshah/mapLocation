@@ -285,8 +285,14 @@ jobs:
         working-directory: android
         env:
           REACT_NATIVE_PACKAGE_NAME: com.maplocation
+          REACT_NATIVE_ROOT: ${{ github.workspace }}
         run: |
           chmod +x gradlew
+          # Ensure we're in the project root for React Native config
+          cd ${{ github.workspace }}
+          npx react-native config > /tmp/rn-config.json 2>&1 || true
+          cat /tmp/rn-config.json | grep -A 5 "packageName" || echo "Config check"
+          cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
       
       - name: Upload Release APK
@@ -369,8 +375,14 @@ jobs:
         working-directory: android
         env:
           REACT_NATIVE_PACKAGE_NAME: com.maplocation
+          REACT_NATIVE_ROOT: ${{ github.workspace }}
         run: |
           chmod +x gradlew
+          # Ensure we're in the project root for React Native config
+          cd ${{ github.workspace }}
+          npx react-native config > /tmp/rn-config.json 2>&1 || true
+          cat /tmp/rn-config.json | grep -A 5 "packageName" || echo "Config check"
+          cd android
           ./gradlew bundleRelease --no-daemon --stacktrace
       
       - name: Upload Release AAB
