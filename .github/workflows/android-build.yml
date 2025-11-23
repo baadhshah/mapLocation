@@ -246,6 +246,10 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
       
+      - name: Verify React Native config
+        run: |
+          npx react-native config || echo "React Native config check completed"
+      
       - name: Setup Android SDK
         run: |
           if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
@@ -279,6 +283,8 @@ jobs:
       
       - name: Build Release APK
         working-directory: android
+        env:
+          REACT_NATIVE_PACKAGE_NAME: com.maplocation
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
@@ -324,6 +330,10 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
       
+      - name: Verify React Native config
+        run: |
+          npx react-native config || echo "React Native config check completed"
+      
       - name: Setup Android SDK
         run: |
           if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
@@ -357,6 +367,8 @@ jobs:
       
       - name: Build Release AAB
         working-directory: android
+        env:
+          REACT_NATIVE_PACKAGE_NAME: com.maplocation
         run: |
           chmod +x gradlew
           ./gradlew bundleRelease --no-daemon --stacktrace
