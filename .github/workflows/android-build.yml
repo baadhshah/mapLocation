@@ -1,4 +1,4 @@
-name: Android Build Pipeline (Lint → Test → Build AAB)
+name: Android Build Pipeline (Lint → Test → Build AAB → Upload Artifact)
 
 on:
   push:
@@ -72,7 +72,6 @@ jobs:
       - name: Run unit tests (if configured)
         run: |
           if npm run | grep -q "test"; then
-            # prefer CI mode for jest; fall back to plain npm test
             npm test -- --ci --reporters=default || npm test
           else
             echo "No npm test script found; skipping JS unit tests"
@@ -153,17 +152,43 @@ jobs:
       - name: Build Android AAB (bundleRelease)
         working-directory: android
         env:
-          ANDROID_SDK_ROOT: ${{ env.RUNNER_TEMP }}/android-sdk
-          ANDROID_HOME: ${{ env.RUNNER_TEMP }}/android-sdk
+          ANDROID_SDK_ROOT: "${RUNNER_TEMP}/android-sdk"
+          ANDROID_HOME: "${RUNNER_TEMP}/android-sdk"
         run: |
           set -euo pipefail
           export ANDROID_SDK_ROOT="${RUNNER_TEMP}/android-sdk"
           export ANDROID_HOME="${RUNNER_TEMP}/android-sdk"
           ./gradlew clean bundleRelease --no-daemon --stacktrace
 
-      - name: Upload AAB artifact
-        if: success()
+      - name: Upload built-aab (make available to downstream job)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-aab
+          path: android/app/build/outputs/bundle/release/*.aab
+
+  upload:
+    name: Upload Artifact (separate stage)
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (for context)
+        uses: actions/checkout@v4
+
+      - name: Download built artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: built-aab
+          path: ./downloaded
+
+      - name: Verify artifact exists
+        run: |
+          ls -la downloaded || true
+          echo "Artifacts downloaded to ./downloaded"
+
+      - name: Re-upload artifact (final)
         uses: actions/upload-artifact@v4
         with:
           name: app-aab
-          path: android/app/build/outputs/bundle/release/*.aab
+          path: ./downloaded/**/*.aab
