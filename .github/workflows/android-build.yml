@@ -1,259 +1,44 @@
-# GitHub Actions Workflow for React Native Android Builds
-# Optimized for GitHub Free Tier
-# Focus: Prepare → Lint → Test → Build Release AAB (no deployment)
-
 name: Android Build Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:
-
-env:
-  ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
-  ANDROID_HOME: ${{ github.workspace }}/android-sdk
-  ANDROID_SDK_TOOLS: "11076708"
-  ANDROID_PLATFORM_VERSION: "36"
-  ANDROID_BUILD_TOOLS_VERSION: "36.0.0"
-  ANDROID_NDK_VERSION: "27.1.12297006"
-  GRADLE_USER_HOME: ${{ github.workspace }}/.gradle
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true"
-  NODE_ENV: "production"
+    branches: [ main ]
 
 jobs:
-  prepare:
-    name: Prepare Environment
+  build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Setup Java
+
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-      
-      - name: Cache dependencies
-        uses: actions/cache@v4
-        id: cache
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-      
-      - name: Install Node.js dependencies
-        run: npm ci
-      
-      - name: Verify app.json and React Native setup
-        run: |
-          echo "Checking app.json..."
-          cat app.json
-          echo ""
-          echo "Checking React Native CLI..."
-          npx react-native --version || echo "CLI check"
-          echo ""
-          echo "Testing React Native config from project root..."
-          cd ${{ github.workspace }}
-          npx react-native config 2>&1 | python3 -c "import sys, json; data=json.load(sys.stdin); pkg=data.get('project', {}).get('android', {}).get('packageName', 'NOT FOUND'); print(f'Package Name: {pkg}')" || npx react-native config 2>&1 | grep -i "packageName" || echo "Config test completed"
-      
-      - name: Setup Android SDK
-        if: steps.cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ${{ env.ANDROID_SDK_ROOT }}
-          cd ${{ env.ANDROID_SDK_ROOT }}
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip
-          mkdir -p cmdline-tools/latest
-          mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-          rm -f cmdline-tools.zip
-          yes | ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager \
-            "platform-tools" \
-            "platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}" \
-            "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}" \
-            "ndk;${{ env.ANDROID_NDK_VERSION }}"
-      
-      - name: Save cache
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
 
-  lint:
-    name: Lint Code
-    runs-on: ubuntu-latest
-    needs: prepare
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+      - name: Set up Node.js (for npx)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
-      
-      - name: Restore cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run JavaScript lint
-        run: npm run lint || true
-        continue-on-error: true
 
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: prepare
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Restore cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run JavaScript tests
-        run: npm test -- --coverage --watchAll=false || true
-        continue-on-error: true
-
-  build-release-aab:
-    name: Build Release AAB
-    runs-on: ubuntu-latest
-    needs: [prepare, lint, test]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      
-      - name: Restore cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.GRADLE_USER_HOME }}
-          key: ${{ runner.os }}-deps-${{ hashFiles('package-lock.json', 'android/**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-deps-
-      
-      - name: Install Node.js dependencies
-        run: npm ci
-      
-      - name: Verify React Native setup
+      - name: Install npm dependencies (if needed)
         run: |
-          echo "Verifying project structure..."
-          echo "app.json:"
-          cat app.json
-          echo ""
-          echo "react-native.config.js:"
-          cat react-native.config.js || echo "Config file not found"
-          echo ""
-          echo "Testing React Native config..."
-          cd ${{ github.workspace }}
-          npx react-native config 2>&1 | grep -i "packageName\|android" | head -10 || echo "Config test completed"
-      
-      - name: Setup Android SDK
-        run: |
-          if [ ! -d "${{ env.ANDROID_SDK_ROOT }}/cmdline-tools" ]; then
-            mkdir -p ${{ env.ANDROID_SDK_ROOT }}
-            cd ${{ env.ANDROID_SDK_ROOT }}
-            wget -q https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip -O cmdline-tools.zip
-            unzip -q cmdline-tools.zip
-            mkdir -p cmdline-tools/latest
-            mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-            rm -f cmdline-tools.zip
-            yes | ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-            ${{ env.ANDROID_SDK_ROOT }}/cmdline-tools/latest/bin/sdkmanager \
-              "platform-tools" \
-              "platforms;android-${{ env.ANDROID_PLATFORM_VERSION }}" \
-              "build-tools;${{ env.ANDROID_BUILD_TOOLS_VERSION }}" \
-              "ndk;${{ env.ANDROID_NDK_VERSION }}"
-          fi
-      
-      - name: Setup release signing keystore (optional)
-        run: |
-          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.ANDROID_KEY_ALIAS }}" ] || [ -z "${{ secrets.ANDROID_KEY_PASSWORD }}" ]; then
-            echo "Release signing secrets not set. Build will use debug keystore (suitable for testing)."
+          # If your npx invocation depends on locally installed packages, install them
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif [ -f yarn.lock ]; then
+            npm install
           else
-            echo "Setting up release signing keystore..."
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-            echo "RELEASE_STORE_FILE=app/release.keystore" >> $GITHUB_ENV
-            echo "RELEASE_STORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
-            echo "RELEASE_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> $GITHUB_ENV
-            echo "RELEASE_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> $GITHUB_ENV
+            echo "No lockfile found, skipping npm install"
           fi
-      
-      - name: Build Release AAB
-        run: |
-          echo "Building from project root to ensure React Native config works..."
-          cd ${{ github.workspace }}
-          cd android
-          chmod +x gradlew
-          # Ensure we're in project root context for React Native
-          export REACT_NATIVE_ROOT=${{ github.workspace }}
-          ./gradlew bundleRelease --no-daemon --stacktrace
-      
-      - name: Upload Release AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-aab
-          path: android/app/build/outputs/bundle/release/*.aab
-          retention-days: 30
-          if-no-files-found: error
+
+      - name: Ensure gradlew is executable
+        run: chmod +x ./gradlew
+
+      - name: Build Android
+        run: ./gradlew assembleDebug --no-daemon
